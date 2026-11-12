@@ -3,14 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GIBIPRINTS | RS Multilogística - Controle de Diárias e Prestação</title>
+    <title>Controle de Diárias e Prestação de Serviços</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Supabase JS -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- jsPDF & html2canvas for Exporting -->
+    <!-- SheetJS (XLSX) for Excel Export -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- jsPDF & html2canvas for PDF/JPG Export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
@@ -21,20 +23,20 @@
         <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col md:flex-row justify-between items-center gap-4">
             <div class="flex items-center gap-3">
                 <div class="bg-blue-600 text-white p-2.5 rounded-xl shadow-md flex items-center justify-center font-black text-xl tracking-wider">
-                    GIBI
+                    GESTÃO
                 </div>
                 <div>
                     <h1 class="text-lg font-bold flex items-center gap-2">
-                        GIBIPRINTS <span class="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded border border-blue-500/30">RS Multilogística</span>
+                        Controle de Diárias <span class="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/30">Multi-Empresas</span>
                     </h1>
-                    <p class="text-xs text-slate-400">Gestão de Diárias, NFs e Conciliação Financeira (Nuvem)</p>
+                    <p class="text-xs text-slate-400">Gestão de Prestação de Serviços, NFs e Conciliação</p>
                 </div>
             </div>
 
             <!-- Company Selector & Quick Actions -->
             <div class="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
                 <div class="flex items-center gap-2 bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-700 flex-1 md:flex-none">
-                    <span class="text-xs text-slate-400 font-medium"><i class="fa-solid fa-building text-blue-400"></i> Tomadora:</span>
+                    <span class="text-xs text-slate-400 font-medium"><i class="fa-solid fa-building text-blue-400"></i> Empresa:</span>
                     <select id="empresaSelect" onchange="switchEmpresa()" class="bg-transparent text-sm font-semibold text-white focus:outline-none cursor-pointer w-full md:w-48">
                         <option value="" class="bg-slate-800">Carregando empresas...</option>
                     </select>
@@ -42,10 +44,6 @@
 
                 <button onclick="openModalEmpresa()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-3 py-2 rounded-lg transition flex items-center gap-1.5 shadow">
                     <i class="fa-solid fa-plus"></i> Nova Empresa
-                </button>
-
-                <button onclick="openModalConfig()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-semibold px-3 py-2 rounded-lg transition flex items-center gap-1.5 shadow" title="Configurar Supabase">
-                    <i class="fa-solid fa-gear"></i>
                 </button>
             </div>
         </div>
@@ -62,14 +60,13 @@
                 </div>
                 <div>
                     <div class="text-xs text-slate-400">Prestador de Serviço</div>
-                    <div class="font-bold text-sm text-white" id="prestadorDisplay">Maickon da Silva Danner (CNPJ não configurado)</div>
+                    <div class="font-bold text-sm text-white" id="prestadorDisplay">Maickon da Silva Danner</div>
                 </div>
             </div>
             <div class="flex items-center gap-3">
-                <span id="syncStatus" class="inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                    <i class="fa-solid fa-triangle-exclamation"></i> Configure o Supabase
+                <span id="syncStatus" class="inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <i class="fa-solid fa-cloud"></i> Sincronizado com Supabase (Nuvem)
                 </span>
-                <button onclick="openModalConfig()" class="text-xs text-blue-400 hover:underline">Ajustar Conexão</button>
             </div>
         </div>
 
@@ -85,7 +82,7 @@
                 <i class="fa-solid fa-wallet"></i> Recebíveis & Pagamentos
             </button>
             <button onclick="switchTab('conciliacao')" id="tab-conciliacao" class="tab-btn px-4 py-2.5 rounded-lg text-sm font-semibold transition bg-slate-800 text-slate-300 hover:bg-slate-700 flex items-center gap-2 whitespace-nowrap">
-                <i class="fa-solid fa-scale-balanced"></i> Conciliação & Relatórios
+                <i class="fa-solid fa-scale-balanced"></i> Conciliação & Exportação
             </button>
         </div>
 
@@ -115,7 +112,7 @@
             <div class="bg-slate-800 rounded-xl border border-slate-700 shadow overflow-hidden">
                 <div class="p-4 border-b border-slate-700 flex justify-between items-center">
                     <h3 class="font-bold text-sm text-white flex items-center gap-2">
-                        <i class="fa-solid fa-list text-blue-400"></i> Histórico de Diárias da Empresa
+                        <i class="fa-solid fa-list text-blue-400"></i> Histórico de Diárias da Empresa Selecionada
                     </h3>
                     <div class="flex items-center gap-2">
                         <input type="month" id="filtroMesDiaria" onchange="renderDiarias()" class="bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-3 py-1.5 focus:outline-none">
@@ -227,17 +224,20 @@
             </div>
         </div>
 
-        <!-- TAB 4: CONCILIAÇÃO & RELATÓRIOS -->
+        <!-- TAB 4: CONCILIAÇÃO & EXPORTAÇÃO -->
         <div id="content-conciliacao" class="tab-content space-y-6 hidden">
             <div class="bg-slate-800 rounded-xl border border-slate-700 p-6 shadow space-y-6">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-700 pb-4">
                     <div>
                         <h3 class="text-lg font-bold text-white flex items-center gap-2">
-                            <i class="fa-solid fa-scale-balanced text-blue-400"></i> Balanço e Conciliação Financeira
+                            <i class="fa-solid fa-scale-balanced text-blue-400"></i> Balanço, Planilha Excel e Relatórios
                         </h3>
-                        <p class="text-xs text-slate-400 mt-1">Cruzamento exato entre diárias trabalhadas, notas fiscais e valores recebidos.</p>
+                        <p class="text-xs text-slate-400 mt-1">Cruzamento exato de valores e exportação completa para Excel (.xlsx), PDF e JPG.</p>
                     </div>
-                    <div class="flex gap-2">
+                    <div class="flex flex-wrap gap-2">
+                        <button onclick="exportExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-4 py-2 rounded-lg transition shadow flex items-center gap-2">
+                            <i class="fa-solid fa-file-excel"></i> Baixar Planilha (.XLSX)
+                        </button>
                         <button onclick="exportPDF()" class="bg-red-600 hover:bg-red-500 text-white text-xs font-semibold px-4 py-2 rounded-lg transition shadow flex items-center gap-2">
                             <i class="fa-solid fa-file-pdf"></i> Exportar PDF
                         </button>
@@ -288,57 +288,26 @@
         <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
             <div class="flex justify-between items-center border-b border-slate-700 pb-3">
                 <h3 class="font-bold text-base text-white flex items-center gap-2">
-                    <i class="fa-solid fa-building text-blue-400"></i> Cadastrar Nova Tomadora
+                    <i class="fa-solid fa-building text-blue-400"></i> Cadastrar Nova Empresa Tomadora
                 </h3>
                 <button onclick="closeModalEmpresa()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
             </div>
             <div class="space-y-3">
                 <div>
-                    <label class="text-xs font-medium text-slate-300">CNPJ da Empresa Tomadora:</label>
+                    <label class="text-xs font-medium text-slate-300">CNPJ da Empresa:</label>
                     <div class="flex gap-2 mt-1">
                         <input type="text" id="inputCnpjTomadora" placeholder="00.000.000/0001-00" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500">
                         <button onclick="consultarCnpjEmpresa()" type="button" class="bg-slate-700 hover:bg-slate-600 text-white text-xs px-3 py-2 rounded-lg transition font-semibold">Buscar</button>
                     </div>
                 </div>
                 <div>
-                    <label class="text-xs font-medium text-slate-300">Nome da Empresa Tomadora:</label>
-                    <input type="text" id="inputNomeTomadora" placeholder="Ex: RS Multilogística" class="w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500">
-                </div>
-                <div class="border-t border-slate-700 pt-3">
-                    <label class="text-xs font-medium text-slate-300">O seu CNPJ (Prestador - Maickon):</label>
-                    <input type="text" id="inputCnpjPrestador" placeholder="Seu CNPJ" class="w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500">
+                    <label class="text-xs font-medium text-slate-300">Nome / Razão Social da Empresa:</label>
+                    <input type="text" id="inputNomeTomadora" placeholder="Ex: Nome da Empresa Tomadora" class="w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500">
                 </div>
             </div>
             <div class="flex justify-end gap-2 pt-3 border-t border-slate-700">
                 <button onclick="closeModalEmpresa()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold rounded-lg">Cancelar</button>
                 <button onclick="salvarNovaEmpresa()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg shadow">Salvar Empresa</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL: CONFIGURAÇÃO SUPABASE -->
-    <div id="modalConfig" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
-            <div class="flex justify-between items-center border-b border-slate-700 pb-3">
-                <h3 class="font-bold text-base text-white flex items-center gap-2">
-                    <i class="fa-solid fa-gear text-blue-400"></i> Configurar Banco Supabase
-                </h3>
-                <button onclick="closeModalConfig()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
-            </div>
-            <p class="text-xs text-slate-400">Insira as credenciais do seu projeto Supabase para sincronizar os dados na nuvem.</p>
-            <div class="space-y-3">
-                <div>
-                    <label class="text-xs font-medium text-slate-300">Supabase URL:</label>
-                    <input type="text" id="supabaseUrlInput" placeholder="https://xxxx.supabase.co" class="w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500">
-                </div>
-                <div>
-                    <label class="text-xs font-medium text-slate-300">Supabase Anon Key:</label>
-                    <input type="password" id="supabaseKeyInput" placeholder="eyJhbGciOi..." class="w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500">
-                </div>
-            </div>
-            <div class="flex justify-end gap-2 pt-3 border-t border-slate-700">
-                <button onclick="closeModalConfig()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold rounded-lg">Cancelar</button>
-                <button onclick="salvarConfigSupabase()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg shadow">Conectar & Salvar</button>
             </div>
         </div>
     </div>
@@ -449,8 +418,12 @@
 
     <!-- Application Logic -->
     <script>
+        // Configuração automática via variáveis de ambiente da Vercel injetadas em window._env ou chaves embutidas
+        // Caso utilize variáveis de ambiente no build da Vercel ou Supabase padrão
+        const SUPABASE_URL = "https://vzljokbhligyahmwzszg.supabase.co";
+        const SUPABASE_ANON_KEY = "sb_publishable_aoQsTbODF9mG-b4R96uT0A_NPYZg7t1"; // Substitua ou deixe conectado
+        
         let supabaseClient = null;
-        let config = JSON.parse(localStorage.getItem('gibiprints_config') || '{"url":"","key":""}');
         let empresas = [];
         let empresaAtualId = null;
         let diarias = [];
@@ -459,55 +432,17 @@
 
         // Init
         window.addEventListener('DOMContentLoaded', async () => {
-            document.getElementById('supabaseUrlInput').value = config.url || '';
-            document.getElementById('supabaseKeyInput').value = config.key || '';
-            
-            // Set default month in filter
             const now = new Date();
             document.getElementById('filtroMesDiaria').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2, '0')}`;
 
-            if(config.url && config.key) {
-                initSupabase();
+            try {
+                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
                 await carregarEmpresas();
-            } else {
-                updateSyncStatus(false, 'Supabase não configurado');
+            } catch(e) {
+                console.error("Erro ao conectar no Supabase:", e);
+                alert("Erro ao conectar com o banco de dados.");
             }
         });
-
-        function initSupabase() {
-            try {
-                supabaseClient = window.supabase.createClient(config.url, config.key);
-                updateSyncStatus(true, 'Conectado ao Supabase');
-            } catch(e) {
-                updateSyncStatus(false, 'Erro ao conectar');
-            }
-        }
-
-        function updateSyncStatus(connected, msg) {
-            const el = document.getElementById('syncStatus');
-            if(connected) {
-                el.className = 'inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
-                el.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> ${msg}`;
-            } else {
-                el.className = 'inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20';
-                el.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> ${msg}`;
-            }
-        }
-
-        function openModalConfig() { document.getElementById('modalConfig').classList.remove('hidden'); }
-        function closeModalConfig() { document.getElementById('modalConfig').classList.add('hidden'); }
-
-        async function salvarConfigSupabase() {
-            const url = document.getElementById('supabaseUrlInput').value.trim();
-            const key = document.getElementById('supabaseKeyInput').value.trim();
-            if(!url || !key) { alert('Preencha URL e Chave'); return; }
-            config = { url, key };
-            localStorage.setItem('gibiprints_config', JSON.stringify(config));
-            closeModalConfig();
-            initSupabase();
-            await carregarEmpresas();
-            alert('Configuração salva com sucesso!');
-        }
 
         // Modais Gerais
         function openModalEmpresa() { document.getElementById('modalEmpresa').classList.remove('hidden'); }
@@ -544,7 +479,6 @@
             if(empresas.length === 0) {
                 select.innerHTML = '<option value="">Nenhuma empresa cadastrada</option>';
                 empresaAtualId = null;
-                document.getElementById('prestadorDisplay').innerText = 'Nenhum prestador configurado';
             } else {
                 empresas.forEach(emp => {
                     const opt = document.createElement('option');
@@ -554,7 +488,6 @@
                 });
                 empresaAtualId = empresas[0].id;
                 select.value = empresaAtualId;
-                document.getElementById('prestadorDisplay').innerText = `${empresas[0].nome_prestador || 'Não informado'} (CNPJ: ${empresas[0].cnpj_prestador || 'N/A'})`;
                 await carregarDadosEmpresaAtual();
             }
         }
@@ -562,24 +495,19 @@
         async function switchEmpresa() {
             const select = document.getElementById('empresaSelect');
             empresaAtualId = select.value;
-            const emp = empresas.find(e => e.id === empresaAtualId);
-            if(emp) {
-                document.getElementById('prestadorDisplay').innerText = `${emp.nome_prestador || 'Não informado'} (CNPJ: ${emp.cnpj_prestador || 'N/A'})`;
-            }
             await carregarDadosEmpresaAtual();
         }
 
         async function salvarNovaEmpresa() {
-            if(!supabaseClient) { alert('Configure o Supabase primeiro'); return; }
+            if(!supabaseClient) return;
             const cnpjTomadora = document.getElementById('inputCnpjTomadora').value.trim();
             const nomeTomadora = document.getElementById('inputNomeTomadora').value.trim();
-            const cnpjPrestador = document.getElementById('inputCnpjPrestador').value.trim();
-            if(!cnpjTomadora || !nomeTomadora) { alert('Preencha os dados da tomadora'); return; }
+            if(!cnpjTomadora || !nomeTomadora) { alert('Preencha os dados da empresa'); return; }
 
             const { data, error } = await supabaseClient.from('empresas').insert([{
                 cnpj_tomadora: cnpjTomadora,
                 nome_tomadora: nomeTomadora,
-                cnpj_prestador: cnpjPrestador,
+                cnpj_prestador: "00.000.000/0001-00",
                 nome_prestador: "Maickon da Silva Danner"
             }]).select();
 
@@ -587,7 +515,6 @@
             closeModalEmpresa();
             document.getElementById('inputCnpjTomadora').value = '';
             document.getElementById('inputNomeTomadora').value = '';
-            document.getElementById('inputCnpjPrestador').value = '';
             await carregarEmpresas();
         }
 
@@ -595,15 +522,12 @@
         async function carregarDadosEmpresaAtual() {
             if(!empresaAtualId || !supabaseClient) return;
 
-            // Diárias
             const resD = await supabaseClient.from('diarias').select('*').eq('empresa_id', empresaAtualId).order('data', { ascending: false });
             diarias = resD.data || [];
 
-            // Notas Fiscais
             const resN = await supabaseClient.from('notas_fiscais').select('*').eq('empresa_id', empresaAtualId).order('data_emissao', { ascending: false });
             notasFiscais = resN.data || [];
 
-            // Recebíveis
             const resR = await supabaseClient.from('recebiveis').select('*').eq('empresa_id', empresaAtualId).order('data_recebimento', { ascending: false });
             recebiveis = resR.data || [];
 
@@ -714,7 +638,7 @@
             let arquivo_url = null;
             if(fileInput.files.length > 0) {
                 const file = fileInput.files[0];
-                arquivo_url = await uploadStorage(file, 'nfs');
+                arquivo_url = await uploadStorage(file);
             }
 
             const { error } = await supabaseClient.from('notas_fiscais').insert([{
@@ -770,7 +694,7 @@
             let comprovante_url = null;
             if(fileInput.files.length > 0) {
                 const file = fileInput.files[0];
-                comprovante_url = await uploadStorage(file, 'recebiveis');
+                comprovante_url = await uploadStorage(file);
             }
 
             const { error } = await supabaseClient.from('recebiveis').insert([{
@@ -785,9 +709,7 @@
             await carregarDadosEmpresaAtual();
         }
 
-        // Upload Helper (Converte para Base64 se não houver bucket configurado ou envia ao storage)
-        async function uploadStorage(file, folder) {
-            // Para garantir funcionamento sem burocracia de bucket no Supabase, convertemos para Base64 DataURL ou tentamos Storage se houver
+        async function uploadStorage(file) {
             return new Promise((resolve) => {
                 const reader = new FileReader();
                 reader.onload = (e) => resolve(e.target.result);
@@ -795,7 +717,6 @@
             });
         }
 
-        // Deletar Registro
         async function deletarRegistro(tabela, id) {
             if(!confirm('Deseja realmente excluir este registro?')) return;
             const { error } = await supabaseClient.from(tabela).delete().eq('id', id);
@@ -824,17 +745,16 @@
                 if(totalNFs > totalDiarias) {
                     divBox.className = 'p-4 rounded-xl border bg-amber-500/10 border-amber-500/30 text-amber-300';
                     divTitle.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> Alerta: Notas Fiscais acima das Diárias`;
-                    divDesc.innerText = `As notas fiscais emitidas (R$ ${totalNFs.toFixed(2)}) estão maiores que o total de diárias (R$ ${totalDiarias.toFixed(2)}). Utilize o campo de justificativa abaixo.`;
+                    divDesc.innerText = `As notas fiscais emitidas (R$ ${totalNFs.toFixed(2)}) estão maiores que o total de diárias (R$ ${totalDiarias.toFixed(2)}).`;
                 } else {
                     divBox.className = 'p-4 rounded-xl border bg-blue-500/10 border-blue-500/30 text-blue-300';
                     divTitle.innerHTML = `<i class="fa-solid fa-circle-info"></i> Aviso: Diárias maiores que Notas Fiscais`;
-                    divDesc.innerText = `Você tem diárias acumuladas (R$ ${totalDiarias.toFixed(2)}) superiores às notas emitidas (R$ ${totalNFs.toFixed(2)}). Emita novas NFs para bater os valores.`;
+                    divDesc.innerText = `Você tem diárias acumuladas (R$ ${totalDiarias.toFixed(2)}) superiores às notas emitidas (R$ ${totalNFs.toFixed(2)}).`;
                 }
             } else {
                 divBox.classList.add('hidden');
             }
 
-            // Carregar justificativa da empresa atual
             const emp = empresas.find(e => e.id === empresaAtualId);
             if(emp && emp.observacao_conciliacao) {
                 document.getElementById('obsConciliacao').value = emp.observacao_conciliacao;
@@ -849,7 +769,32 @@
             await supabaseClient.from('empresas').update({ observacao_conciliacao: obs }).eq('id', empresaAtualId);
         }
 
-        // Exportar PDF e JPG
+        // Exportar Excel (.XLSX)
+        function exportExcel() {
+            const wb = XLSX.utils.book_new();
+
+            // Aba de Diárias
+            const wsDiariasData = [["Data", "Veículo", "Valor (R$)", "Observações"]];
+            diarias.forEach(d => wsDiariasData.push([d.data, d.veiculo, Number(d.valor), d.observacao || ""]));
+            const wsDiarias = XLSX.utils.aoa_to_sheet(wsDiariasData);
+            XLSX.utils.book_append_sheet(wb, wsDiarias, "Diárias");
+
+            // Aba de Notas Fiscais
+            const wsNFsData = [["Número NF", "Data Emissão", "Valor (R$)"]];
+            notasFiscais.forEach(n => wsNFsData.push([n.numero, n.data_emissao, Number(n.valor)]));
+            const wsNFs = XLSX.utils.aoa_to_sheet(wsNFsData);
+            XLSX.utils.book_append_sheet(wb, wsNFs, "Notas Fiscais");
+
+            // Aba de Recebíveis
+            const wsRecData = [["Data Recebimento", "Valor Pago (R$)"]];
+            recebiveis.forEach(r => wsRecData.push([r.data_recebimento, Number(r.valor)]));
+            const wsRec = XLSX.utils.aoa_to_sheet(wsRecData);
+            XLSX.utils.book_append_sheet(wb, wsRec, "Recebíveis");
+
+            XLSX.writeFile(wb, `controle-financeiro-${Date.now()}.xlsx`);
+        }
+
+        // Exportar PDF
         async function exportPDF() {
             const { jsPDF } = window.jspdf;
             const element = document.getElementById('printArea');
@@ -858,26 +803,24 @@
             
             const pdf = new jsPDF('p', 'mm', 'a4');
             const imgWidth = 190;
-            const pageHeight = 295;
             const imgHeight = (canvas.height * imgWidth) / canvas.width;
-            let heightLeft = imgHeight;
-            let position = 10;
 
             pdf.setFillColor(15, 23, 42);
             pdf.rect(0, 0, 210, 297, 'F');
             pdf.setTextColor(255, 255, 255);
             pdf.setFontSize(16);
-            pdf.text("GIBIPRINTS | RS Multilogística - Relatório Financeiro", 10, 15);
+            pdf.text("Relatório de Prestação de Serviços", 10, 15);
             
             pdf.addImage(imgData, 'PNG', 10, 25, imgWidth, imgHeight);
-            pdf.save(`relatorio-financeiro-${Date.now()}.pdf`);
+            pdf.save(`relatorio-${Date.now()}.pdf`);
         }
 
+        // Exportar JPG
         async function exportJPG() {
             const element = document.getElementById('printArea');
             const canvas = await html2canvas(element, { scale: 2, backgroundColor: '#0f172a' });
             const link = document.createElement('a');
-            link.download = `relatorio-financeiro-${Date.now()}.jpg`;
+            link.download = `relatorio-${Date.now()}.jpg`;
             link.href = canvas.toDataURL('image/jpeg', 0.9);
             link.click();
         }
