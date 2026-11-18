@@ -23,3 +23,49 @@ input:focus, textarea:focus, select:focus { outline: 2px solid #2563eb55; outlin
 }
 
 .grid{display:grid}.gap-2{gap:.5rem}.min-h-screen{min-height:100vh}
+
+
+/* Ajustes adicionais de painel e experiência mobile */
+.dashboard-filter{justify-content:space-between;align-items:center;margin-bottom:16px}
+.month-input{max-width:190px}
+.stat-card{min-width:0;overflow-wrap:anywhere}
+.panel,.main-area,.content{min-width:0}
+.table-wrap{max-width:100%;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
+.table-wrap table{white-space:nowrap}
+#page-content .toolbar .field{max-width:100%}
+@media(max-width:700px){
+  .app-shell{display:block;min-height:100dvh}
+  .main-area{width:100%;min-width:0}
+  .topbar{min-height:76px;height:auto;padding:12px;align-items:center}
+  .topbar>div:nth-child(2){min-width:0}
+  .topbar h1{font-size:16px;line-height:1.25}
+  .top-actions{gap:6px;flex-shrink:0}
+  .top-actions .primary-btn{white-space:nowrap;padding:10px 9px;font-size:10px}
+  .content{padding:14px 10px;min-height:calc(100dvh - 130px)}
+  .grid-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .stat-card{padding:12px 10px;border-radius:12px}
+  .stat-value{font-size:clamp(15px,4.2vw,19px);overflow-wrap:anywhere}
+  .stat-top{gap:5px;align-items:center;font-size:8px}
+  .stat-foot{font-size:9px}
+  .two-col{grid-template-columns:minmax(0,1fr);gap:10px}
+  .panel{padding:13px 11px;margin-bottom:12px;border-radius:12px}
+  .panel-head{align-items:flex-start;flex-wrap:wrap}
+  .toolbar{align-items:stretch}
+  .toolbar>*{max-width:100%}
+  .dashboard-filter{display:flex;flex-direction:column;align-items:stretch}
+  .month-input{width:100%;max-width:none}
+  .form-grid{grid-template-columns:minmax(0,1fr);gap:12px}
+  .form-field.full{grid-column:1}
+  .modal-backdrop{padding:8px;align-items:flex-start}
+  .modal{width:100%;max-height:calc(100dvh - 16px);padding:15px 12px;border-radius:14px}
+  .modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .modal-actions button{min-height:46px}
+  .nav-link{font-size:14px;min-height:46px}
+  .table-wrap table{min-width:680px}
+  footer{padding:14px 10px;line-height:1.6}
+}
+@media(min-width:701px) and (max-width:1050px){
+  .content{padding:22px 18px}
+  .grid-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .two-col{grid-template-columns:minmax(0,1fr)}
+}

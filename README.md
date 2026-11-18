@@ -81,3 +81,11 @@ Para restauração mais fiel, prefira o JSON completo. A importação substitui 
 - A autenticação Google autoriza somente o Drive para backups; não existe conta/senha própria do sistema.
 - A consulta de CNPJ utiliza BrasilAPI.
 - A conciliação é uma visão inicial de notas fiscais menos recebimentos, sem vínculo individual entre recebimento e NF.
+
+
+## Atualização de novembro/2026
+- Painel inicial agora mostra total de diárias, diárias pagas e pendentes, notas fiscais, recebimentos e saldo das NFs por mês.
+- Cada diária possui situação de pagamento (Pendente/Pago), editável no histórico.
+- Valores de diária já utilizados aparecem como sugestões no próximo lançamento.
+- Ao salvar uma diária, o aplicativo retorna à visão geral para mostrar os indicadores atualizados.
+- Layout aprimorado para celulares, com cartões em duas colunas e tabelas com rolagem horizontal.
