@@ -1,0 +1,79 @@
+# CD - Controle de Diárias
+
+Aplicativo web responsivo/PWA para controlar empresas tomadoras, diárias, notas fiscais e recebimentos. **Não utiliza Supabase.**
+
+## Como os dados são armazenados
+
+- Os registros operacionais ficam no IndexedDB do navegador/aparelho.
+- O Google Drive recebe cópias de segurança JSON quando o usuário toca em **Fazer backup agora**.
+- Os arquivos ficam visíveis na raiz de **Meu Drive**, com nome `CD-Controle-de-Diarias-backup-...json`.
+- A integração usa Google Identity Services + Drive API v3 com escopo `drive.file`, que limita o acesso aos arquivos criados/abertos pelo aplicativo. O app não lê seus documentos pessoais.
+- O token OAuth fica somente em memória. Depois de atualizar/reabrir o app ou quando o token expirar, conecte o Gmail novamente.
+- Não há sincronização automática entre aparelhos. Para levar os dados para outro celular, faça backup no aparelho antigo e restaure no novo.
+
+> Atenção: dados novos ficam inicialmente apenas no aparelho. Se limpar os dados do navegador, desinstalar/formatar ou trocar de aparelho antes de enviar um backup, os lançamentos que ainda não foram copiados ao Drive não poderão ser recuperados.
+
+## Arquivos
+
+- `index.html`: interface e bibliotecas externas.
+- `styles.css`: tema escuro responsivo.
+- `app.js`: telas, CRUD local, cálculos e exportações.
+- `drive.js`: autenticação Google e operações de backup/restauração no Drive.
+- `config.js`: OAuth Client ID opcional.
+- `manifest.webmanifest`, `sw.js`, `icon.svg`, `icon-192.png`, `icon-512.png`: instalação PWA e cache básico.
+
+## Configurar Google Drive (faça uma vez)
+
+1. Acesse [Google Cloud Console](https://console.cloud.google.com/) com o Gmail que será usado para os backups.
+2. Crie um projeto (por exemplo, `CD Controle de Diarias`).
+3. No seletor de APIs, abra **APIs e serviços → Biblioteca**, procure **Google Drive API** e clique em **Ativar**.
+4. Configure a tela de consentimento OAuth em **Google Auth Platform** (ou **APIs e serviços → Tela de consentimento OAuth**, conforme a interface):
+   - Tipo de usuário: **Externo**, se aparecer essa opção.
+   - Nome do app: `CD - Controle de Diárias`.
+   - Informe um e-mail de suporte e seu e-mail de contato.
+   - Em **Público-alvo / Audience**, deixe em **Testing / Teste** enquanto só você usa e adicione seu próprio Gmail em **Test users / Usuários de teste**.
+   - Não solicite escopos amplos de Drive. O aplicativo pede somente `https://www.googleapis.com/auth/drive.file`.
+5. Vá a **Clientes / Clients → Criar cliente / Create client** e escolha **Aplicativo da Web / Web application**.
+6. Dê um nome, por exemplo `CD Vercel`.
+7. Em **Origens JavaScript autorizadas**, adicione a origem do seu site Vercel, sem caminho e sem barra final, por exemplo `https://seu-projeto.vercel.app`. Adicione também `http://localhost:3000` apenas se for testar localmente. Depois que tiver domínio próprio, adicione também `https://seudominio.com`.
+8. Crie o cliente e copie o **Client ID** que termina em `.apps.googleusercontent.com`. Não use nem publique Client Secret. Este projeto usa o fluxo de token no navegador e não precisa de Client Secret.
+9. Abra o app publicado, entre em **Configurações / Backup**, cole o Client ID e toque em **Salvar configuração neste navegador**.
+10. Toque em **Conectar meu Gmail**, escolha a conta correta e autorize o acesso. Depois toque em **Procurar backups no Drive** ou **Fazer backup agora**.
+
+Durante o modo de teste, o Google pode mostrar um aviso de aplicativo não verificado. Como você adicionou seu Gmail como usuário de teste, prossiga somente se reconhecer o nome do aplicativo e o projeto que criou. Para disponibilizar a terceiros, será necessário configurar a publicação e cumprir as exigências de verificação do Google aplicáveis ao app/escopos.
+
+## Subir no GitHub e publicar na Vercel
+
+1. Baixe e extraia o ZIP do projeto.
+2. No GitHub, crie um repositório novo, por exemplo `CD-Controle-de-Diarias`.
+3. Envie **todos os arquivos e pastas que estão dentro** da pasta extraída para a raiz do repositório. O `index.html` deve ficar na raiz, não dentro de outra pasta.
+4. Entre em [Vercel](https://vercel.com/), escolha **Add New → Project**, importe o repositório GitHub.
+5. Como é um site estático simples, use preset **Other**; deixe Build Command vazio e Output Directory como `.` (raiz do projeto).
+6. Clique em Deploy. A Vercel fornecerá um endereço `https://...vercel.app`.
+7. Volte ao Google Cloud Console e confirme que esse endereço exato está nas Origens JavaScript autorizadas do cliente OAuth. Se adicionar ou mudar o domínio, atualize essa lista.
+8. A cada novo envio/commit para a branch de produção conectada (normalmente `main`), a Vercel fará uma nova implantação automaticamente.
+
+## Instalar como aplicativo no Android
+
+1. Abra o endereço `https://...vercel.app` no Chrome do celular.
+2. Aguarde o site carregar e abra o menu de três pontinhos do Chrome.
+3. Toque em **Instalar app** ou **Adicionar à tela inicial** (o texto pode variar).
+4. Confirme. O ícone CD aparecerá na tela inicial.
+
+O PWA precisa ser servido por HTTPS (a Vercel já fornece HTTPS). A instalação não cria uma cópia independente dos dados: ela usa o armazenamento do navegador no mesmo aparelho.
+
+## Backup e restauração
+
+- Para salvar: Configurações / Backup → Conectar meu Gmail → Fazer backup agora.
+- Para listar cópias: Configurações / Backup → Procurar backups no Drive.
+- Para recuperar: conecte o mesmo Gmail, procure os backups, selecione um e confirme. A restauração substitui os registros locais atuais.
+- Recomenda-se fazer um backup antes de qualquer troca/formatação do aparelho e conferir no Drive se o arquivo foi criado.
+
+## Limitações conhecidas
+
+- Esta versão é local-first: não sincroniza automaticamente vários aparelhos e não oferece edição simultânea.
+- O navegador pode apagar armazenamento local em cenários de limpeza/gerenciamento; backups manuais são essenciais.
+- Comprovantes continuam sendo registrados como links (não há upload de anexos nesta versão).
+- A autenticação Google autoriza somente o Drive para backups; não existe conta/senha própria do sistema.
+- A consulta de CNPJ utiliza BrasilAPI.
+- A conciliação é uma visão inicial de notas fiscais menos recebimentos, sem vínculo individual entre recebimento e NF.

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#020617"><meta name="description" content="Controle financeiro de diárias, notas fiscais e recebimentos."><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg" type="image/svg+xml"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><title>CD - Controle de Diárias</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body class="min-h-screen">
+  <div class="app-shell">
+    <aside id="sidebar" class="sidebar">
+      <div class="brand"><div class="brand-mark">CD</div><div><b>Controle de Diárias</b><small>GESTÃO FINANCEIRA</small></div></div>
+      <nav id="navigation">
+        <button class="nav-link active" data-page="dashboard"><i class="fa-solid fa-chart-pie"></i> Visão geral</button>
+        <button class="nav-link" data-page="empresas"><i class="fa-solid fa-building"></i> Empresas</button>
+        <button class="nav-link" data-page="diarias"><i class="fa-solid fa-calendar-check"></i> Diárias</button>
+        <button class="nav-link" data-page="notas"><i class="fa-solid fa-file-invoice"></i> Notas fiscais</button>
+        <button class="nav-link" data-page="recebiveis"><i class="fa-solid fa-money-bill-transfer"></i> Recebimentos</button>
+        <button class="nav-link" data-page="relatorios"><i class="fa-solid fa-file-export"></i> Relatórios</button>
+        <button class="nav-link" data-page="configuracoes"><i class="fa-solid fa-cloud"></i> Configurações / Backup</button>
+      </nav>
+      <div class="sidebar-bottom"><span class="status-dot"></span><span id="connection-label">Verificando conexão...</span></div>
+    </aside>
+    <main class="main-area">
+      <header class="topbar">
+        <button id="menu-toggle" class="icon-btn mobile-only" aria-label="Abrir menu"><i class="fa-solid fa-bars"></i></button>
+        <div><div class="eyebrow">GESTÃO DE PRESTAÇÃO DE SERVIÇOS</div><h1 id="page-title">Visão geral</h1></div>
+        <div class="top-actions"><span class="today" id="today"></span><button class="primary-btn" id="quick-diary"><i class="fa-solid fa-plus"></i> Nova diária</button></div>
+      </header>
+      <section id="page-content" class="content"></section>
+      <footer>CD - Controle de Diárias <span>•</span> Gestão financeira de viagens e serviços</footer>
+    </main>
+  </div>
+  <div id="modal-root"></div>
+  <div id="toast-root" class="toast-root"></div>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="config.js"></script><script src="drive.js"></script><script src="app.js"></script>
+  <script>if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(console.error));}</script>
+</body></html>

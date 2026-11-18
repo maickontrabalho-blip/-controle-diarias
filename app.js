@@ -1,0 +1,120 @@
+/* CD - Controle de Diárias | armazenamento local + Google Drive */
+(() => {
+  const $ = s => document.querySelector(s);
+  const money = v => Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+  const dateBR = v => v ? new Date(`${String(v).slice(0,10)}T12:00:00`).toLocaleDateString('pt-BR') : '—';
+  const today = new Date().toISOString().slice(0,10);
+  const cfg = window.APP_CONFIG || {};
+  if(localStorage.getItem('CD_GOOGLE_CLIENT_ID')) cfg.GOOGLE_CLIENT_ID=localStorage.getItem('CD_GOOGLE_CLIENT_ID');
+  const state = {page:'dashboard',empresas:[],diarias:[],notas:[],recebiveis:[],month:today.slice(0,7),driveBackups:[]};
+  const tables = {empresas:'empresas',diarias:'diarias',notas:'notas_fiscais',recebiveis:'recebiveis'};
+  const titles = {dashboard:'Visão geral',empresas:'Empresas',diarias:'Diárias',notas:'Notas fiscais',recebiveis:'Recebimentos',relatorios:'Relatórios',configuracoes:'Configurações e backup'};
+  let localDB;
+  const DB_NAME='cd-controle-diarias';
+  function openLocalDB(){return new Promise((resolve,reject)=>{const req=indexedDB.open(DB_NAME,1);req.onupgradeneeded=()=>{const db=req.result;Object.values(tables).forEach(name=>{if(!db.objectStoreNames.contains(name))db.createObjectStore(name,{keyPath:'id'});});};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});}
+  function storeRequest(store,mode,action){return new Promise((resolve,reject)=>{const tx=localDB.transaction(store,mode),req=action(tx.objectStore(store));req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);tx.onabort=()=>reject(tx.error);});}
+  async function getAll(store){return (await storeRequest(store,'readonly',s=>s.getAll()))||[];}
+  async function saveRecord(store,data,id){const record={...data,id:id||crypto.randomUUID(),created_at:data.created_at||new Date().toISOString(),updated_at:new Date().toISOString()};await storeRequest(store,'readwrite',s=>s.put(record));return record;}
+  async function deleteRecord(store,id){return storeRequest(store,'readwrite',s=>s.delete(id));}
+  async function loadAll(){
+    try{localDB=localDB||await openLocalDB();for(const [key,table] of Object.entries(tables))state[key]=(await getAll(table)).sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));$('#connection-label').textContent='Dados salvos neste aparelho';$('.status-dot')?.classList.add('online');render();}
+    catch(e){console.error(e);$('#connection-label').textContent='Erro no armazenamento';toast('Não foi possível abrir o banco local: '+e.message);}
+  }
+  const sum=(arr,key='valor')=>arr.reduce((n,x)=>n+Number(x[key]||0),0);
+  function companyName(id){return state.empresas.find(x=>x.id===id)?.razao_social||state.empresas.find(x=>x.id===id)?.nome_fantasia||'Empresa removida';}
+  function monthFilter(arr,key='data'){return arr.filter(x=>String(x[key]||'').slice(0,7)===state.month);}
+  function stat(label,value,icon,color,foot=''){return `<article class="stat-card"><div class="stat-top"><span>${label}</span><span class="stat-icon ${color}"><i class="${icon}"></i></span></div><div class="stat-value">${value}</div><div class="stat-foot">${foot}</div></article>`;}
+  function panel(title,sub,body,action=''){return `<section class="panel"><div class="panel-head"><div><h2>${title}</h2>${sub?`<p>${sub}</p>`:''}</div>${action}</div>${body}</section>`;}
+  function table(headers,rows,empty='Nenhum registro encontrado.'){return `<div class="table-wrap"><table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows||`<tr><td colspan="${headers.length}" class="empty">${empty}</td></tr>`}</tbody></table></div>`;}
+  function render(){
+    $('#page-title').textContent=titles[state.page]||'Visão geral';
+    const root=$('#page-content');
+    const pages={dashboard:dashboard,empresas:companies,diarias:diaries,notas:invoices,recebiveis:payments,relatorios:reports,configuracoes:settings};
+    root.innerHTML=(pages[state.page]||dashboard)();
+    bindPage();
+  }
+  function dashboard(){
+    const d=monthFilter(state.diarias), n=monthFilter(state.notas), r=monthFilter(state.recebiveis);
+    const totalD=sum(d,'valor_total'), totalN=sum(n), totalR=sum(r);
+    const rows=state.empresas.map(e=>{const ds=d.filter(x=>x.empresa_id===e.id),ns=n.filter(x=>x.empresa_id===e.id),rs=r.filter(x=>x.empresa_id===e.id);return `<tr><td><b>${esc(e.nome_fantasia||e.razao_social)}</b></td><td>${money(sum(ds,'valor_total'))}</td><td>${money(sum(ns))}</td><td class="green">${money(sum(rs))}</td><td class="amber">${money(Math.max(0,sum(ns)-sum(rs)))}</td></tr>`}).join('');
+    return `<div class="toolbar" style="justify-content:space-between;margin-bottom:16px"><span class="hint">Indicadores do mês selecionado</span><input class="field" style="max-width:180px" type="month" id="month-filter" value="${state.month}"></div>
+    <div class="grid-stats">${stat('DIÁRIAS NO MÊS',money(totalD),'fa-solid fa-route','blue',`${d.length} lançamento(s)`)}${stat('NOTAS FISCAIS',money(totalN),'fa-solid fa-file-invoice','blue',`${n.length} nota(s)`)}${stat('RECEBIDO',money(totalR),'fa-solid fa-circle-check','green',`${r.length} recebimento(s)`)}${stat('SALDO DE NFs',money(Math.max(0,totalN-totalR)),'fa-solid fa-hourglass-half','amber','NFs menos recebimentos')}</div>
+    <div class="two-col">${panel('Balanço por empresa','Resumo do período',table(['Empresa','Diárias','Notas fiscais','Recebido','Saldo a receber'],rows))}${panel('Atalhos','Ações rápidas',`<div class="grid gap-2"><button class="secondary-btn" data-open="empresa"><i class="fa-solid fa-building"></i> Cadastrar empresa</button><button class="secondary-btn" data-open="diaria"><i class="fa-solid fa-calendar-plus"></i> Lançar diária</button><button class="secondary-btn" data-open="nota"><i class="fa-solid fa-file-circle-plus"></i> Registrar nota fiscal</button><button class="secondary-btn" data-open="recebivel"><i class="fa-solid fa-money-bill"></i> Registrar recebimento</button></div>`)}</div>`;
+  }
+  function companies(){
+    const q=($('#search')?.value||'').toLowerCase();
+    const rows=state.empresas.filter(e=>(e.razao_social+' '+e.nome_fantasia+' '+e.cnpj).toLowerCase().includes(q)).map(e=>`<tr><td><b>${esc(e.nome_fantasia||e.razao_social)}</b><div class="hint">${esc(e.razao_social||'')}</div></td><td>${esc(e.cnpj||'—')}</td><td>${esc(e.telefone||'—')}</td><td>${esc(e.email||'—')}</td><td><div class="actions"><button class="mini-btn" data-edit="empresa" data-id="${e.id}"><i class="fa fa-pen"></i></button><button class="mini-btn" data-delete="empresas" data-id="${e.id}"><i class="fa fa-trash"></i></button></div></td></tr>`).join('');
+    return panel('Empresas tomadoras','Cadastre e mantenha os dados das empresas contratantes',`<div class="toolbar" style="margin-bottom:14px"><input id="search" class="search" placeholder="Buscar empresa ou CNPJ"><button class="primary-btn" data-open="empresa"><i class="fa fa-plus"></i> Nova empresa</button></div>${table(['Empresa','CNPJ','Telefone','E-mail','Ações'],rows,'Cadastre sua primeira empresa.')}`);
+  }
+  function diaries(){
+    const rows=state.diarias.map(x=>`<tr><td>${dateBR(x.data)}</td><td>${esc(companyName(x.empresa_id))}</td><td>${esc(x.veiculo_tipo||'—')}</td><td>${esc(x.rota||'—')}</td><td>${money(x.valor_total)}</td><td><button class="mini-btn" data-delete="diarias" data-id="${x.id}"><i class="fa fa-trash"></i></button></td></tr>`).join('');
+    return panel('Diárias trabalhadas','Histórico de serviços e viagens',`<div class="toolbar" style="margin-bottom:14px"><input class="field" style="max-width:180px" type="month" id="month-filter" value="${state.month}"><button class="primary-btn" data-open="diaria"><i class="fa fa-plus"></i> Nova diária</button></div>${table(['Data','Empresa','Veículo','Rota / observação','Valor','Ações'],rows)}`);
+  }
+  function invoices(){
+    const rows=state.notas.map(x=>`<tr><td>${esc(x.numero||'—')}</td><td>${dateBR(x.data_emissao)}</td><td>${esc(companyName(x.empresa_id))}</td><td>${money(x.valor)}</td><td>${esc(x.status||'Emitida')}</td><td><button class="mini-btn" data-delete="notas_fiscais" data-id="${x.id}"><i class="fa fa-trash"></i></button></td></tr>`).join('');
+    return panel('Notas fiscais','Registre as notas emitidas e seus valores',`<div class="toolbar" style="margin-bottom:14px"><button class="primary-btn" data-open="nota"><i class="fa fa-plus"></i> Nova nota fiscal</button></div>${table(['Número','Emissão','Empresa','Valor','Status','Ações'],rows)}`);
+  }
+  function payments(){
+    const rows=state.recebiveis.map(x=>`<tr><td>${dateBR(x.data)}</td><td>${esc(companyName(x.empresa_id))}</td><td>${esc(x.forma_pagamento||'—')}</td><td>${money(x.valor)}</td><td>${esc(x.observacoes||'—')}</td><td><button class="mini-btn" data-delete="recebiveis" data-id="${x.id}"><i class="fa fa-trash"></i></button></td></tr>`).join('');
+    return panel('Recebimentos','Acompanhe pagamentos e conciliação',`<div class="toolbar" style="margin-bottom:14px"><button class="primary-btn" data-open="recebivel"><i class="fa fa-plus"></i> Novo recebimento</button></div>${table(['Data','Empresa','Forma','Valor','Observações','Ações'],rows)}`);
+  }
+  function reports(){return `<div class="grid-stats">${stat('EMPRESAS',state.empresas.length,'fa-solid fa-building','blue','Tomadoras cadastradas')}${stat('DIÁRIAS',state.diarias.length,'fa-solid fa-route','green','Lançamentos totais')}${stat('NOTAS FISCAIS',state.notas.length,'fa-solid fa-file-invoice','blue','Registros totais')}${stat('RECEBIMENTOS',state.recebiveis.length,'fa-solid fa-wallet','green','Registros totais')}</div>${panel('Exportação de dados','Gere planilhas e relatórios para conferência',`<div class="toolbar"><button class="primary-btn" id="export-xlsx"><i class="fa-solid fa-file-excel"></i> Exportar Excel consolidado</button><button class="secondary-btn" id="export-pdf"><i class="fa-solid fa-file-pdf"></i> Exportar PDF</button><button class="secondary-btn" id="export-jpg"><i class="fa-solid fa-image"></i> Exportar JPG</button></div><p class="hint" style="margin-top:14px">O Excel contém abas separadas para empresas, diárias, notas fiscais e recebimentos. O PDF/JPG captura o resumo atual da tela.</p>`)}`;}
+  function bindPage(){
+    $('#month-filter')?.addEventListener('change',e=>{state.month=e.target.value;render()});
+    $('#search')?.addEventListener('input',()=>{const p=$('#search').selectionStart;render();$('#search').focus();$('#search').setSelectionRange(p,p)});
+    document.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openForm(b.dataset.open));
+    document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openForm(b.dataset.edit,b.dataset.id));
+    document.querySelectorAll('[data-delete]').forEach(b=>b.onclick=()=>removeRow(b.dataset.delete,b.dataset.id));
+    $('#export-xlsx')?.addEventListener('click',exportExcel);
+    $('#export-pdf')?.addEventListener('click',()=>capture('pdf'));
+    $('#export-jpg')?.addEventListener('click',()=>capture('jpg'));
+    $('#connect-drive')?.addEventListener('click',connectDrive);
+    $('#backup-drive')?.addEventListener('click',createBackup);
+    $('#refresh-backups')?.addEventListener('click',listBackups);
+    $('#restore-backup')?.addEventListener('change',e=>{if(e.target.value)restoreBackup(e.target.value);});
+    $('#save-config')?.addEventListener('click',saveDriveConfig);
+    $('#disconnect-drive')?.addEventListener('click',disconnectDrive);
+  }
+  const field=(label,name,type='text',value='',full=false,extra='')=>`<div class="form-field ${full?'full':''}"><label>${label}</label><input class="field" name="${name}" type="${type}" value="${esc(value??'')}" ${extra}></div>`;
+  const selectCompany=(value='')=>`<div class="form-field full"><label>Empresa tomadora *</label><select class="field" name="empresa_id" required><option value="">Selecione uma empresa</option>${state.empresas.map(e=>`<option value="${e.id}" ${e.id===value?'selected':''}>${esc(e.nome_fantasia||e.razao_social)}</option>`).join('')}</select></div>`;
+  function openForm(kind,id=null){
+    const map={empresa:['empresas','Nova empresa'],diaria:['diarias','Nova diária'],nota:['notas_fiscais','Nova nota fiscal'],recebivel:['recebiveis','Novo recebimento']};
+    const [table,title]=map[kind], existing=id?state[kind==='empresa'?'empresas':kind==='diaria'?'diarias':kind==='nota'?'notas':'recebiveis'].find(x=>x.id===id):{};
+    let body='';
+    if(kind==='empresa')body=field('CNPJ','cnpj','text',existing?.cnpj,false,'maxlength="18"')+field('Razão social','razao_social','text',existing?.razao_social)+field('Nome fantasia','nome_fantasia','text',existing?.nome_fantasia)+field('Telefone','telefone','tel',existing?.telefone)+field('E-mail','email','email',existing?.email)+field('Observações','observacoes','text',existing?.observacoes,true);
+    if(kind==='diaria')body=selectCompany(existing?.empresa_id)+field('Data do serviço','data','date',existing?.data||today)+`<div class="form-field"><label>Tipo de veículo</label><select name="veiculo_tipo" class="field"><option>Carro</option><option>Van</option><option>Ônibus</option><option>Caminhão</option><option>Outro</option></select></div>`+field('Valor da diária (R$)','valor_diaria','number',existing?.valor_diaria||'','', 'step="0.01" min="0" required')+field('Quantidade de diárias','quantidade','number',existing?.quantidade||1,false,'min="0.5" step="0.5" required')+field('Rota / observações','rota','text',existing?.rota,true);
+    if(kind==='nota')body=selectCompany(existing?.empresa_id)+field('Número da NF','numero','text',existing?.numero)+field('Data de emissão','data_emissao','date',existing?.data_emissao||today)+field('Valor da nota (R$)','valor','number',existing?.valor||'','', 'step="0.01" min="0" required')+field('Status','status','text',existing?.status||'Emitida')+field('Link do comprovante','comprovante_url','url',existing?.comprovante_url,true);
+    if(kind==='recebivel')body=selectCompany(existing?.empresa_id)+field('Data do recebimento','data','date',existing?.data||today)+field('Valor recebido (R$)','valor','number',existing?.valor||'','', 'step="0.01" min="0" required')+`<div class="form-field"><label>Forma de pagamento</label><select name="forma_pagamento" class="field"><option>Pix</option><option>Transferência</option><option>Depósito</option><option>Dinheiro</option><option>Outro</option></select></div>`+field('Link do comprovante','comprovante_url','url',existing?.comprovante_url)+field('Observações','observacoes','text',existing?.observacoes,true);
+    $('#modal-root').innerHTML=`<div class="modal-backdrop"><div class="modal"><h2>${title}</h2><p class="modal-sub">Preencha os dados abaixo. Campos com * são obrigatórios.</p><form id="record-form"><div class="form-grid">${body}</div><div class="modal-actions"><button type="button" class="secondary-btn" id="cancel-modal">Cancelar</button><button class="primary-btn" type="submit">Salvar registro</button></div></form></div></div>`;
+    $('#cancel-modal').onclick=()=>$('#modal-root').innerHTML='';
+    $('#record-form').onsubmit=async e=>{e.preventDefault();const data=Object.fromEntries(new FormData(e.target).entries());Object.keys(data).forEach(k=>{if(data[k]==='')data[k]=null});
+      if(kind==='diaria')data.valor_total=Number(data.valor_diaria)*Number(data.quantidade);
+      for(const k of ['valor','valor_diaria','quantidade','valor_total'])if(data[k]!=null)data[k]=Number(data[k]);
+      try{await saveRecord(table,data,id);$('#modal-root').innerHTML='';toast('Registro salvo neste aparelho!');await loadAll();}catch(err){toast('Erro ao salvar: '+err.message);}
+    };
+  }
+  async function removeRow(table,id){if(!confirm('Tem certeza que deseja excluir este registro?'))return;try{await deleteRecord(table,id);toast('Registro excluído.');await loadAll();}catch(e){toast('Erro ao excluir: '+e.message);}}
+  function settings(){
+    const connected=window.CDDrive?.isConnected()||false;
+    const backups=state.driveBackups.map(b=>`<option value="${esc(b.id)}">${esc(b.name)} — ${dateBR(b.modifiedTime)}</option>`).join('');
+    return `<div class="two-col"><section class="panel"><div class="panel-head"><div><h2><i class="fa-brands fa-google-drive"></i> Google Drive</h2><p>Conecte seu Gmail para guardar cópias de segurança</p></div><span class="pill ${connected?'green':'amber'}">${connected?'Conectado':'Não conectado'}</span></div><p class="hint">O aplicativo cria arquivos de backup visíveis no seu Meu Drive. Ele só acessa os arquivos que criar com este aplicativo, não seus documentos pessoais.</p><div class="toolbar" style="margin-top:16px"><button class="primary-btn" id="connect-drive">${connected?'Reconectar Gmail':'Conectar meu Gmail'}</button><button class="secondary-btn" id="disconnect-drive">Desconectar</button></div><div class="form-field" style="margin-top:18px"><label>Google OAuth Client ID</label><input id="oauth-client-id" class="field" value="${esc(cfg.GOOGLE_CLIENT_ID||'')}" placeholder="000000000000-abc...apps.googleusercontent.com"></div><button class="secondary-btn" id="save-config" style="margin-top:10px">Salvar configuração neste navegador</button><p class="hint" style="margin-top:12px">O Client ID é uma identificação pública do aplicativo. Nunca coloque senha do Gmail, chave secreta ou client secret aqui.</p></section><section class="panel"><div class="panel-head"><div><h2>Backup e restauração</h2><p>Crie uma cópia agora ou recupere uma anterior</p></div></div><div class="grid" style="gap:10px"><button class="primary-btn" id="backup-drive" ${connected?'':'disabled'}><i class="fa-solid fa-cloud-arrow-up"></i> Fazer backup agora</button><button class="secondary-btn" id="refresh-backups" ${connected?'':'disabled'}><i class="fa-solid fa-rotate"></i> Procurar backups no Drive</button><div class="form-field"><label>Escolha um backup para restaurar</label><select class="field" id="restore-backup" ${connected?'':'disabled'}><option value="">${connected?(backups?'Selecione um backup':'Clique em procurar backups'):'Conecte o Gmail primeiro'}</option>${backups}</select></div></div><p class="hint" style="margin-top:14px">A restauração substitui os dados atuais deste aparelho pelos dados da cópia selecionada. O aplicativo pedirá confirmação antes de fazer isso.</p></section></div><section class="panel"><h2>Onde ficam os dados?</h2><p class="hint">Os cadastros são armazenados no banco local do navegador (IndexedDB). Os backups são arquivos JSON no seu Google Drive, na pasta principal do Meu Drive. Faça backup sempre que terminar lançamentos importantes. A instalação PWA usa o mesmo armazenamento do navegador daquele aparelho.</p></section>`;
+  }
+  function saveDriveConfig(){const id=$('#oauth-client-id')?.value.trim();if(!id||!id.endsWith('.apps.googleusercontent.com')){toast('Informe um OAuth Client ID válido do Google.');return;}localStorage.setItem('CD_GOOGLE_CLIENT_ID',id);cfg.GOOGLE_CLIENT_ID=id;toast('Client ID salvo neste navegador. Agora toque em Conectar meu Gmail.');}
+  async function connectDrive(){try{const id=localStorage.getItem('CD_GOOGLE_CLIENT_ID')||cfg.GOOGLE_CLIENT_ID;if(!id){toast('Primeiro configure o OAuth Client ID abaixo.');return;}window.CDDrive.configure(id);await window.CDDrive.connect();toast('Google Drive conectado com sucesso!');render();await listBackups();}catch(e){console.error(e);toast('Não foi possível conectar: '+e.message);}}
+  function disconnectDrive(){window.CDDrive?.disconnect();state.driveBackups=[];toast('Conexão do Google Drive encerrada neste navegador.');render();}
+  async function createBackup(){try{const payload={app:'CD - Controle de Diárias',formatVersion:1,createdAt:new Date().toISOString(),data:{}};for(const [key,table] of Object.entries(tables))payload.data[key]=await getAll(table);const result=await window.CDDrive.uploadBackup(payload);toast('Backup enviado ao Google Drive!');await listBackups();}catch(e){console.error(e);toast('Falha no backup: '+e.message);}}
+  async function listBackups(){try{state.driveBackups=await window.CDDrive.listBackups();render();if(!state.driveBackups.length)toast('Nenhum backup encontrado no Drive.');}catch(e){toast('Erro ao procurar backups: '+e.message);}}
+  async function restoreBackup(fileId){if(!confirm('ATENÇÃO: esta ação substituirá todos os cadastros atuais deste aparelho pelos dados do backup. Deseja continuar?')){render();return;}try{const payload=await window.CDDrive.downloadBackup(fileId);if(payload?.app!=='CD - Controle de Diárias'||payload?.formatVersion!==1||!payload.data)throw new Error('Este arquivo não é um backup válido do CD Controle de Diárias.');for(const key of Object.keys(tables)){if(!Array.isArray(payload.data[key]))throw new Error('Backup incompleto: '+key);}
+      for(const table of Object.values(tables))await storeRequest(table,'readwrite',s=>s.clear());
+      for(const [key,table] of Object.entries(tables)){for(const row of payload.data[key])await storeRequest(table,'readwrite',s=>s.put(row));}
+      toast('Restauração concluída!');await loadAll();state.page='dashboard';render();
+    }catch(e){console.error(e);toast('Falha ao restaurar: '+e.message);}}
+  async function lookupCNPJ(cnpj){const clean=cnpj.replace(/\D/g,'');if(clean.length!==14)return;try{const res=await fetch(`https://brasilapi.com.br/api/cnpj/v1/${clean}`);if(!res.ok)throw Error('CNPJ não encontrado');const d=await res.json();$('input[name="razao_social"]').value=d.razao_social||'';$('input[name="nome_fantasia"]').value=d.nome_fantasia||'';toast('Dados da empresa preenchidos.');}catch(e){toast(e.message);}}
+  function exportExcel(){if(!window.XLSX){toast('Biblioteca Excel indisponível.');return;}const wb=XLSX.utils.book_new();for(const [key,label] of [['empresas','Empresas'],['diarias','Diárias'],['notas','Notas Fiscais'],['recebiveis','Recebimentos']]){const data=state[key].map(x=>({...x,empresa_id:x.empresa_id?companyName(x.empresa_id):undefined}));XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(data.length?data:[{Aviso:'Sem registros'}]),label);}XLSX.writeFile(wb,`CD-Controle-de-Diarias-${today}.xlsx`);}
+  async function capture(type){const node=$('#page-content');try{const canvas=await html2canvas(node,{backgroundColor:'#020617',scale:2});if(type==='jpg'){const a=document.createElement('a');a.download=`CD-Balanco-${today}.jpg`;a.href=canvas.toDataURL('image/jpeg',.95);a.click();}else{const {jsPDF}=window.jspdf;const pdf=new jsPDF('p','mm','a4');const w=190,h=canvas.height*w/canvas.width;let y=8;let remaining=h;while(remaining>0){pdf.addImage(canvas.toDataURL('image/png'),'PNG',10,y,w,h);remaining-=277;if(remaining>0){pdf.addPage();y-=277;}}pdf.save(`CD-Balanco-${today}.pdf`);} }catch(e){toast('Falha na exportação: '+e.message);}}
+  $('#navigation').addEventListener('click',e=>{const b=e.target.closest('[data-page]');if(!b)return;state.page=b.dataset.page;document.querySelectorAll('.nav-link').forEach(x=>x.classList.toggle('active',x===b));$('#sidebar').classList.remove('open');render();});
+  $('#menu-toggle').onclick=()=>$('#sidebar').classList.toggle('open');
+  $('#quick-diary').onclick=()=>openForm('diaria');
+  $('#modal-root').addEventListener('input',e=>{if(e.target.name==='cnpj'&&e.target.value.replace(/\D/g,'').length===14)lookupCNPJ(e.target.value);});
+  loadAll();render();
+})();
