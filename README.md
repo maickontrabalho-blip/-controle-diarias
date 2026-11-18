@@ -17,7 +17,7 @@ Aplicativo web responsivo/PWA para controlar empresas tomadoras, diárias, notas
 
 - `index.html`: interface e bibliotecas externas.
 - `styles.css`: tema escuro responsivo.
-- `app.js`: telas, CRUD local, cálculos e exportações.
+- `app.js`: telas, CRUD local, cálculos, exportação Excel/JSON e importação/restauração.
 - `drive.js`: autenticação Google e operações de backup/restauração no Drive.
 - `config.js`: OAuth Client ID opcional.
 - `manifest.webmanifest`, `sw.js`, `icon.svg`, `icon-192.png`, `icon-512.png`: instalação PWA e cache básico.
@@ -64,9 +64,13 @@ O PWA precisa ser servido por HTTPS (a Vercel já fornece HTTPS). A instalação
 
 ## Backup e restauração
 
-- Para salvar: Configurações / Backup → Conectar meu Gmail → Fazer backup agora.
-- Para listar cópias: Configurações / Backup → Procurar backups no Drive.
-- Para recuperar: conecte o mesmo Gmail, procure os backups, selecione um e confirme. A restauração substitui os registros locais atuais.
+Há duas formas de proteger e recuperar os dados:
+
+1. **Sem configurar Google Cloud:** em Configurações / Backup, toque em **Baixar backup completo**. O navegador baixa um arquivo JSON. Você pode guardá-lo no aparelho, em Downloads, ou enviar manualmente para o Google Drive. Para recuperar, selecione o mesmo arquivo no campo **Restaurar backup do celular, Downloads ou Google Drive**.
+2. **Planilha Excel:** toque em **Exportar planilha Excel**. O arquivo contém abas de Empresas, Diarias, Notas Fiscais e Recebimentos e mantém os IDs internos para permitir a importação. Também pode ser selecionado no campo de restauração.
+3. **Integração direta com Drive:** continua disponível para quem já configurou OAuth Client ID. Conecte o Gmail, faça backup ou procure os arquivos criados pelo aplicativo.
+
+Para restauração mais fiel, prefira o JSON completo. A importação substitui os dados atuais do aparelho e pede confirmação antes de executar. Faça uma cópia dos dados atuais antes de restaurar.
 - Recomenda-se fazer um backup antes de qualquer troca/formatação do aparelho e conferir no Drive se o arquivo foi criado.
 
 ## Limitações conhecidas
