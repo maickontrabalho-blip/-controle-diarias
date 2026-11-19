@@ -89,3 +89,14 @@ Para restauração mais fiel, prefira o JSON completo. A importação substitui 
 - Valores de diária já utilizados aparecem como sugestões no próximo lançamento.
 - Ao salvar uma diária, o aplicativo retorna à visão geral para mostrar os indicadores atualizados.
 - Layout aprimorado para celulares, com cartões em duas colunas e tabelas com rolagem horizontal.
+
+
+## Atualização v5 — comprovantes e relatório por empresa
+
+- Cadastro de nota fiscal aceita anexo PDF ou imagem (até 12 MB por arquivo).
+- Cadastro de recebimento aceita anexo PDF ou imagem (até 12 MB por arquivo).
+- Os anexos ficam armazenados no IndexedDB junto ao registro e podem ser abertos/baixados nas telas de Notas fiscais, Recebimentos e no relatório individual da empresa.
+- O relatório individual por empresa mostra serviços/diárias, notas fiscais, recebimentos e saldo pendente por mês, além dos totais acumulados de todo o histórico.
+- O backup JSON local e o backup no Google Drive incluem os anexos. Para preservar documentos ao trocar de aparelho, faça backup JSON ou no Drive.
+- A planilha Excel exporta os dados tabulares e o nome/tipo dos anexos, mas não incorpora o conteúdo binário dos arquivos. Use JSON/Drive para restauração integral com documentos.
+- O arquivo Excel pode restaurar os registros tabulares, mas não recupera os anexos; para isso, restaure o JSON.
