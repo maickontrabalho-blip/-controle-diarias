@@ -100,3 +100,12 @@ Para restauração mais fiel, prefira o JSON completo. A importação substitui 
 - O backup JSON local e o backup no Google Drive incluem os anexos. Para preservar documentos ao trocar de aparelho, faça backup JSON ou no Drive.
 - A planilha Excel exporta os dados tabulares e o nome/tipo dos anexos, mas não incorpora o conteúdo binário dos arquivos. Use JSON/Drive para restauração integral com documentos.
 - O arquivo Excel pode restaurar os registros tabulares, mas não recupera os anexos; para isso, restaure o JSON.
+
+
+## v7 — revisão do relatório por empresa
+
+- Extrato individual por empresa com indicadores acumulados.
+- Resumo de diárias separado por 1ª e 2ª quinzena, com datas previstas conforme regra de pagamento configurada.
+- Histórico detalhado de diárias, notas fiscais e recebimentos, incluindo comprovantes.
+- Botão explícito “Abrir extrato” para facilitar o acesso em telas móveis.
+- O saldo acumulado é calculado como serviços lançados menos recebimentos registrados; os recebimentos ainda não são vinculados automaticamente a períodos específicos.
