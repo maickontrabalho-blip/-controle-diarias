@@ -135,3 +135,8 @@ html, body { width:100%; min-width:320px; max-width:100%; margin:0; overflow-x:h
 /* V10: compact dashboard card height by ~10%, preserve existing grid */
 .stat-card{padding-top:17px;padding-bottom:17px}
 @media(max-width:700px){.stat-card{padding-top:10.8px;padding-bottom:10.8px}}
+
+/* V11: dashboard em duas colunas, cards aproximadamente 10% mais baixos */
+.dashboard-stat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px;margin-bottom:22px}
+.dashboard-stat-grid .stat-card{padding-top:17px;padding-bottom:17px}
+@media(max-width:700px){.dashboard-stat-grid{gap:9px}.dashboard-stat-grid .stat-card{padding-top:9.7px;padding-bottom:9.7px}}
