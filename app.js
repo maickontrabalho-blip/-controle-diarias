@@ -36,6 +36,10 @@
     root.innerHTML=(pages[state.page]||dashboard)();
     bindPage();
   }
+  function isoTodayLocal(){const now=new Date();return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;}
+  function dueISO(d,company){const due=paymentDueForDiary(d,company);if(!due)return '';const [dd,mm,yy]=due.split('/');return `${yy}-${mm}-${dd}`;}
+  function nextScheduledDefault(){const now=new Date(),day=now.getDate();let year=now.getFullYear(),month=now.getMonth()+1,dueDay;if(day<=5)dueDay=5;else if(day<=20)dueDay=20;else{month+=1;dueDay=5;}if(month>12){month=1;year+=1;}return `${year}-${String(month).padStart(2,'0')}-${String(dueDay).padStart(2,'0')}`;}
+  function upcomingReceivable(){const todayISO=isoTodayLocal();const pending=state.diarias.filter(x=>(x.status_pagamento||'Pendente')!=='Pago');const future=pending.map(x=>({diaria:x,due:dueISO(x,state.empresas.find(e=>String(e.id)===String(x.empresa_id)))})).filter(x=>x.due&&x.due>=todayISO).sort((a,b)=>a.due.localeCompare(b.due));const due=future[0]?.due||nextScheduledDefault();const list=future.filter(x=>x.due===due).map(x=>x.diaria);return {due,list,total:sum(list,'valor_total'),count:list.length};}
   function dashboard(){
     const d=monthFilter(state.diarias), n=monthFilter(state.notas), r=monthFilter(state.recebiveis);
     const totalD=sum(d,'valor_total'), paidD=sum(d.filter(x=>(x.status_pagamento||'Pendente')==='Pago'),'valor_total');
@@ -55,6 +59,7 @@
       ${stat('NOTAS FISCAIS',money(totalN),'fa-solid fa-file-invoice','blue',`${n.length} nota(s)`,'notas')}
       ${stat('RECEBIDO EM PAGAMENTOS',money(totalR),'fa-solid fa-wallet','green',`${r.length} recebimento(s)`,'recebiveis')}
       ${stat('SALDO DE NFs',money(Math.max(0,totalN-totalR)),'fa-solid fa-file-invoice-dollar','amber','NFs menos recebimentos','saldo')}
+      ${(()=>{const next=upcomingReceivable();return stat('PRÓXIMO RECEBIMENTO',`${dateBR(next.due)}<div class=\"stat-value\">${money(next.total)}</div>`,'fa-solid fa-calendar-clock','blue',`${next.count} diária(s) prevista(s)`,'next_recebimento');})()}
     </div>
     ${panel('Empresas cadastradas','Toque em uma empresa para abrir o extrato completo',table(['Empresa','Diárias / total','Pagas','Pendentes','Notas fiscais','Recebido','Saldo de NFs'],rows,'Cadastre uma empresa para começar.'))}
     ${detail}
@@ -62,7 +67,7 @@
     ${panel('Últimas diárias','Lançamentos do mês selecionado',table(['Data','Empresa','Valor','Situação'],recent,'Nenhuma diária registrada neste mês.'))}</div>`;
   }
   function dashboardDetail(type){
-    const labels={diarias:'Todas as diárias do mês',pagas:'Diárias pagas do mês',pendentes:'Diárias pendentes do mês',notas:'Notas fiscais do mês',recebiveis:'Recebimentos do mês',saldo:'Resumo de saldo por empresa'};
+    const labels={diarias:'Todas as diárias do mês',pagas:'Diárias pagas do mês',pendentes:'Diárias pendentes do mês',notas:'Notas fiscais do mês',recebiveis:'Recebimentos do mês',saldo:'Resumo de saldo por empresa',next_recebimento:'Detalhamento do próximo recebimento'};
     const d=monthFilter(state.diarias), n=monthFilter(state.notas), r=monthFilter(state.recebiveis);
     let rows='', headers=[];
     if(type==='diarias'||type==='pagas'||type==='pendentes'){
@@ -75,11 +80,13 @@
     } else if(type==='recebiveis'){
       headers=['Data','Empresa','Forma','Valor','Observações'];
       rows=r.map(x=>`<tr><td>${dateBR(x.data)}</td><td>${esc(companyName(x.empresa_id))}</td><td>${esc(x.forma_pagamento||'—')}</td><td>${money(x.valor)}</td><td>${esc(x.observacoes||'—')}</td></tr>`).join('');
+    } else if(type==='next_recebimento'){
+      const next=upcomingReceivable();headers=['Data da diária','Empresa','Veículo','Rota / observação','Valor','Vencimento'];rows=next.list.map(x=>`<tr><td>${dateBR(x.data)}</td><td>${esc(companyName(x.empresa_id))}</td><td>${esc(x.veiculo_tipo||'—')}</td><td>${esc(x.rota||'—')}</td><td>${money(x.valor_total)}</td><td>${dateBR(next.due)}</td></tr>`).join('');
     } else {
       headers=['Empresa','Diárias','Pagas','Pendentes','Notas','Recebido','Saldo NFs'];
       rows=state.empresas.map(e=>{const ds=d.filter(x=>x.empresa_id===e.id),ns=n.filter(x=>x.empresa_id===e.id),rs=r.filter(x=>x.empresa_id===e.id);const td=sum(ds,'valor_total'),pd=sum(ds.filter(x=>(x.status_pagamento||'Pendente')==='Pago'),'valor_total');return `<tr><td>${esc(e.nome_fantasia||e.razao_social)}</td><td>${money(td)}</td><td>${money(pd)}</td><td>${money(td-pd)}</td><td>${money(sum(ns))}</td><td>${money(sum(rs))}</td><td>${money(Math.max(0,sum(ns)-sum(rs)))}</td></tr>`}).join('');
     }
-    return panel(labels[type]||'Detalhamento',`Detalhamento dos registros de ${state.month}`,`<div class="detail-toolbar"><span class="hint">Registros encontrados: ${type==='diarias'?d.length:type==='pagas'?d.filter(x=>(x.status_pagamento||'Pendente')==='Pago').length:type==='pendentes'?d.filter(x=>(x.status_pagamento||'Pendente')!=='Pago').length:type==='notas'?n.length:type==='recebiveis'?r.length:state.empresas.length}</span><button class="mini-btn" data-close-detail>Fechar</button></div>${table(headers,rows)}`);
+    return panel(labels[type]||'Detalhamento',`Detalhamento dos registros de ${state.month}`,`<div class="detail-toolbar"><span class="hint">Registros encontrados: ${type==='diarias'?d.length:type==='pagas'?d.filter(x=>(x.status_pagamento||'Pendente')==='Pago').length:type==='pendentes'?d.filter(x=>(x.status_pagamento||'Pendente')!=='Pago').length:type==='notas'?n.length:type==='recebiveis'?r.length:type==='next_recebimento'?upcomingReceivable().list.length:state.empresas.length}</span><button class="mini-btn" data-close-detail>Fechar</button></div>${table(headers,rows)}`);
   }
   function companyDetail(id){
     const e=state.empresas.find(x=>x.id===id); if(!e)return '';
@@ -256,7 +263,8 @@
       const list=state.diarias.filter(x=>{const iso=toISO(x.data),day=Number(iso.slice(8,10));return iso.startsWith(month)&&day>=start&&day<=end&&(!companyId||String(x.empresa_id)===String(companyId));}).sort((a,b)=>toISO(a.data).localeCompare(toISO(b.data))||String(a.id||'').localeCompare(String(b.id||'')));
       const total=sum(list,'valor_total'),paid=sum(list.filter(x=>(x.status_pagamento||'Pendente')==='Pago'),'valor_total'),pending=Math.max(0,total-paid),qty=list.reduce((acc,x)=>acc+(Number(x.quantidade)||1),0),label=period==='first'?'1ª quinzena (01–15)':period==='second'?`2ª quinzena (16–${last})`:'Mês completo';
       const columns=(opts.dates?'<th>Data</th>':'')+'<th>Empresa</th><th>Veículo</th><th>Rota / observações</th><th>Qtd.</th>'+(opts.values?'<th>Valor</th>':'')+(opts.due?'<th>Previsão</th>':'')+(opts.status?'<th>Situação</th>':'');
-      const rows=list.map(x=>`<tr>${opts.dates?`<td>${dateBR(x.data)}</td>`:''}<td>${esc(companyName(x.empresa_id))}</td><td>${esc(x.veiculo_tipo||'—')}</td><td class="route-cell">${esc(x.rota||x.observacoes||'—')}</td><td>${esc(x.quantidade||1)}</td>${opts.values?`<td>${money(x.valor_total)}</td>`:''}${opts.due?`<td>${esc(paymentDueForDiary(x,state.empresas.find(e=>String(e.id)===String(x.empresa_id)))||'—')}</td>`:''}${opts.status?`<td>${esc(x.status_pagamento||'Pendente')}</td>`:''}</tr>`).join('');
+      const routeText=x=>String(x.rota??x.observacoes??x.observacao??x.route??x.description??'').trim();
+      const rows=list.map(x=>`<tr>${opts.dates?`<td>${dateBR(x.data)}</td>`:''}<td>${esc(companyName(x.empresa_id))}</td><td>${esc(x.veiculo_tipo||x.veiculo||'—')}</td><td class="route-cell">${esc(routeText(x)||'—')}</td><td>${esc(x.quantidade||1)}</td>${opts.values?`<td>${money(x.valor_total)}</td>`:''}${opts.due?`<td>${esc(paymentDueForDiary(x,state.empresas.find(e=>String(e.id)===String(x.empresa_id)))||'—')}</td>`:''}${opts.status?`<td>${esc(x.status_pagamento||'Pendente')}</td>`:''}</tr>`).join('');
       const art=document.createElement('div');art.className='report-art';art.innerHTML=`<div class=report-brand>CD <span>CONTROLE DE DIÁRIAS</span></div><h1>RELATÓRIO DETALHADO DE TRABALHO</h1><div class=report-sub>${esc(company?.nome_fantasia||company?.razao_social||'Todas as empresas')}<br>${label} • ${new Date(month+'-15T12:00:00').toLocaleDateString('pt-BR',{month:'long',year:'numeric'})}</div>${opts.summary?`<div class=report-summary><div><small>DIÁRIAS / QUANTIDADE</small><b>${qty}</b><small>${list.length} lançamento(s)</small></div><div><small>VALOR TRABALHADO</small><b>${money(total)}</b></div>${opts.status?`<div><small>PAGO</small><b>${money(paid)}</b></div><div><small>PENDENTE</small><b>${money(pending)}</b></div>`:''}</div>`:''}<table class=report-data><thead><tr>${columns}</tr></thead><tbody>${rows||`<tr><td colspan="${8}" class="empty-report">Nenhuma diária encontrada nesse período.</td></tr>`}</tbody></table><div class=report-footer>Registros incluídos: ${list.length} • Quantidade total: ${qty}<br>Gerado em ${new Date().toLocaleString('pt-BR')}</div>`;
       const preview=$('#custom-report-preview');if(!preview)throw new Error('Área de pré-visualização não encontrada. Atualize a página e tente novamente.');preview.innerHTML='';preview.appendChild(art);
       await ensureReportLibraries(type);

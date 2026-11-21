@@ -127,3 +127,11 @@ html, body { width:100%; min-width:320px; max-width:100%; margin:0; overflow-x:h
 
 /* V9 report detail refinements */
 .report-art{width:900px;max-width:100%;padding:34px}.report-data th,.report-data td{vertical-align:top;white-space:normal;overflow-wrap:anywhere}.report-data .route-cell{min-width:150px;max-width:260px;line-height:1.45}.report-data th{font-size:11px;letter-spacing:.04em}.report-data td{font-size:12px}.empty-report{padding:22px;text-align:center;color:#94a3b8}@media(max-width:760px){.report-art{width:900px;max-width:none;padding:24px}.custom-report-preview{overflow-x:auto}}
+
+/* V9.1: route/observation always visible and readable in report exports */
+.report-data .route-cell{min-width:190px;max-width:320px;white-space:normal;overflow-wrap:anywhere;line-height:1.5}
+.report-data{table-layout:auto}
+
+/* V10: compact dashboard card height by ~10%, preserve existing grid */
+.stat-card{padding-top:17px;padding-bottom:17px}
+@media(max-width:700px){.stat-card{padding-top:10.8px;padding-bottom:10.8px}}
