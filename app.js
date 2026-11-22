@@ -54,11 +54,8 @@
     const detail=state.selectedCompanyDetail ? companyDetail(state.selectedCompanyDetail) : (state.dashboardDetail ? dashboardDetail(state.dashboardDetail) : '');
     return `<div class="toolbar dashboard-filter"><span class="hint">Indicadores do mês selecionado</span><input class="field month-input" type="month" id="month-filter" value="${state.month}"></div>
     <div class="dashboard-stat-grid">
-      ${stat('TOTAL DE DIÁRIAS',money(totalD),'fa-solid fa-route','blue',`${d.length} lançamento(s)`,'diarias')}
-      ${stat('DIÁRIAS PAGAS',money(paidD),'fa-solid fa-circle-check','green','Marcadas como pagas','pagas')}
-      ${stat('DIÁRIAS PENDENTES',money(pendingD),'fa-solid fa-hourglass-half','amber','Aguardando pagamento','pendentes')}
-      ${(()=>{const last=latestReceipt();return stat('ÚLTIMO RECEBIMENTO',last?money(last.valor):money(0),'fa-solid fa-wallet','green',last?`Recebido em ${dateBR(last.data)}`:'Nenhum pagamento registrado','latest_recebimento');})()}
-      ${(()=>{const next=upcomingReceivable();return stat('PRÓXIMO RECEBIMENTO',`${dateBR(next.due)}<div class="stat-value">${money(next.total)}</div>`,'fa-solid fa-calendar-clock','blue',`${next.count} diária(s) prevista(s)`,'next_recebimento');})()}
+      ${(()=>{const last=latestReceipt();return stat('ÚLTIMO PAGAMENTO RECEBIDO',last?money(last.valor):money(0),'fa-solid fa-wallet','green',last?`Data: ${dateBR(last.data)}`:'Nenhum pagamento registrado','latest_recebimento');})()}
+      ${(()=>{const next=upcomingReceivable();return stat('PRÓXIMO PAGAMENTO',`${money(next.total)}<div class="stat-value">${dateBR(next.due)}</div>`,'fa-solid fa-calendar-clock','blue',`${next.count} diária(s) prevista(s)`,'next_recebimento');})()}
     </div>
     ${panel('Empresas cadastradas','Toque em uma empresa para abrir o extrato completo',table(['Empresa','Diárias / total','Pagas','Pendentes','Notas fiscais','Recebido','Saldo de NFs'],rows,'Cadastre uma empresa para começar.'))}
     ${detail}
