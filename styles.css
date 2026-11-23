@@ -140,3 +140,16 @@ html, body { width:100%; min-width:320px; max-width:100%; margin:0; overflow-x:h
 .dashboard-stat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px;margin-bottom:22px}
 .dashboard-stat-grid .stat-card{padding-top:17px;padding-bottom:17px}
 @media(max-width:700px){.dashboard-stat-grid{gap:9px}.dashboard-stat-grid .stat-card{padding-top:9.7px;padding-bottom:9.7px}}
+
+/* V15: melhorar legibilidade do próximo pagamento e ajustar relatório para exportação sem corte horizontal */
+.report-art{width:760px;max-width:760px;padding:24px;overflow:hidden;}
+.report-data{width:100%;table-layout:fixed;}
+.report-data th,.report-data td{white-space:normal;overflow-wrap:anywhere;word-break:break-word;padding:7px 5px;font-size:10px;}
+.report-data .route-cell{min-width:0;max-width:none;line-height:1.35;}
+.report-art h1{font-size:21px;}
+.report-summary div{padding:11px;}
+@media(max-width:760px){.report-art{width:760px;max-width:760px;padding:24px;}}
+
+/* V16: botão de contato WhatsApp */
+.whatsapp-btn{display:inline-flex;align-items:center;gap:6px;color:#22c55e!important;border-color:#166534!important;margin-top:6px;text-decoration:none!important;}
+.whatsapp-btn:hover{background:rgba(34,197,94,.12);}

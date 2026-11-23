@@ -39,7 +39,25 @@
   function isoTodayLocal(){const now=new Date();return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;}
   function dueISO(d,company){const due=paymentDueForDiary(d,company);if(!due)return '';const [dd,mm,yy]=due.split('/');return `${yy}-${mm}-${dd}`;}
   function nextScheduledDefault(){const now=new Date(),day=now.getDate();let year=now.getFullYear(),month=now.getMonth()+1,dueDay;if(day<=5)dueDay=5;else if(day<=20)dueDay=20;else{month+=1;dueDay=5;}if(month>12){month=1;year+=1;}return `${year}-${String(month).padStart(2,'0')}-${String(dueDay).padStart(2,'0')}`;}
-  function upcomingReceivable(){const todayISO=isoTodayLocal();const pending=state.diarias.filter(x=>(x.status_pagamento||'Pendente')!=='Pago');const future=pending.map(x=>({diaria:x,due:dueISO(x,state.empresas.find(e=>String(e.id)===String(x.empresa_id)))})).filter(x=>x.due&&x.due>=todayISO).sort((a,b)=>a.due.localeCompare(b.due));const due=future[0]?.due||nextScheduledDefault();const list=future.filter(x=>x.due===due).map(x=>x.diaria);return {due,list,total:sum(list,'valor_total'),count:list.length};}
+  function upcomingReceivable(){
+    const todayISO=isoTodayLocal(), pending=state.diarias.filter(x=>(x.status_pagamento||'Pendente')!=='Pago');
+    const companies=[...new Set(pending.map(x=>String(x.empresa_id)))]; const balances=[];
+    companies.forEach(cid=>{
+      const company=state.empresas.find(e=>String(e.id)===cid);
+      const dueGroups={}; pending.filter(x=>String(x.empresa_id)===cid).forEach(d=>{const due=dueISO(d,company);if(due)(dueGroups[due] ||= []).push(d);});
+      let available=Math.max(0,sum(state.recebiveis.filter(r=>String(r.empresa_id)===cid),'valor')-sum(state.diarias.filter(d=>String(d.empresa_id)===cid&&(d.status_pagamento||'Pendente')==='Pago'),'valor_total'));
+      // Recebimentos são abatidos das diárias pendentes mais antigas primeiro, por empresa.
+      Object.keys(dueGroups).sort().forEach(due=>{
+        const list=dueGroups[due], gross=sum(list,'valor_total'), offset=Math.min(available,gross); available-=offset;
+        const remaining=gross-offset; if(remaining>0) balances.push({due,list,total:remaining,count:list.length,empresa_id:cid});
+      });
+    });
+    balances.sort((a,b)=>a.due.localeCompare(b.due));
+    const first=balances.find(x=>x.due>=todayISO)||balances[0];
+    return first?first:{due:nextScheduledDefault(),list:[],total:0,count:0};
+  }
+  function whatsappLink(phone){const digits=String(phone||'').replace(/\D/g,'');if(!digits)return '';const normalized=digits.startsWith('55')?digits:`55${digits}`;return `https://wa.me/${normalized}`;}
+
   function latestReceipt(){return [...state.recebiveis].filter(x=>Number(x.valor||0)>0).sort((a,b)=>String(b.data||'').localeCompare(String(a.data||''))||String(b.created_at||'').localeCompare(String(a.created_at||'')))[0]||null;}
   function dashboard(){
     const d=monthFilter(state.diarias), n=monthFilter(state.notas), r=monthFilter(state.recebiveis);
@@ -48,14 +66,14 @@
     const rows=state.empresas.map(e=>{
       const ds=d.filter(x=>x.empresa_id===e.id),ns=n.filter(x=>x.empresa_id===e.id),rs=r.filter(x=>x.empresa_id===e.id);
       const td=sum(ds,'valor_total'),pd=sum(ds.filter(x=>(x.status_pagamento||'Pendente')==='Pago'),'valor_total');
-      return `<tr class="clickable-row" data-company-detail="${e.id}" tabindex="0"><td><b>${esc(e.nome_fantasia||e.razao_social)}</b><div class="hint">${esc(e.cnpj||'')}</div></td><td>${ds.length} • ${money(td)}</td><td class="green">${money(pd)}</td><td class="amber">${money(Math.max(0,td-pd))}</td><td>${money(sum(ns))}</td><td class="green">${money(sum(rs))}</td><td class="amber">${money(Math.max(0,sum(ns)-sum(rs)))}</td></tr>`;
+      return `<tr class="clickable-row" data-company-detail="${e.id}" tabindex="0"><td><b>${esc(e.nome_fantasia||e.razao_social)}</b><div class="hint">${esc(e.cnpj||'')}</div>${whatsappLink(e.telefone)?`<a class="mini-btn whatsapp-btn" href="${whatsappLink(e.telefone)}" target="_blank" rel="noopener" onclick="event.stopPropagation()"><i class="fa-brands fa-whatsapp"></i> WhatsApp</a>`:''}</td><td>${ds.length} • ${money(td)}</td><td class="green">${money(pd)}</td><td class="amber">${money(Math.max(0,td-pd))}</td><td>${money(sum(ns))}</td><td class="green">${money(sum(rs))}</td><td class="amber">${money(Math.max(0,sum(ns)-sum(rs)))}</td></tr>`;
     }).join('');
     const recent=[...d].sort((a,b)=>String(b.data||'').localeCompare(String(a.data||''))).slice(0,8).map(x=>`<tr><td>${dateBR(x.data)}</td><td>${esc(companyName(x.empresa_id))}</td><td>${money(x.valor_total)}</td><td><span class="pill ${(x.status_pagamento||'Pendente')==='Pago'?'green':'amber'}">${esc(x.status_pagamento||'Pendente')}</span></td></tr>`).join('');
     const detail=state.selectedCompanyDetail ? companyDetail(state.selectedCompanyDetail) : (state.dashboardDetail ? dashboardDetail(state.dashboardDetail) : '');
     return `<div class="toolbar dashboard-filter"><span class="hint">Indicadores do mês selecionado</span><input class="field month-input" type="month" id="month-filter" value="${state.month}"></div>
     <div class="dashboard-stat-grid">
       ${(()=>{const last=latestReceipt();return stat('ÚLTIMO PAGAMENTO RECEBIDO',last?`${money(last.valor)}<div class="stat-value">${dateBR(last.data)}</div>`:money(0),'fa-solid fa-wallet','green',last?'':'Nenhum pagamento registrado','latest_recebimento');})()}
-      ${(()=>{const next=upcomingReceivable();return stat('PRÓXIMO PAGAMENTO',`${money(next.total)}<div class="stat-value">${dateBR(next.due)}</div>`,'fa-solid fa-calendar-clock','blue',`${next.count} diária(s) prevista(s)`,'next_recebimento');})()}
+      ${(()=>{const next=upcomingReceivable();return stat('PRÓXIMO PAGAMENTO',`${money(next.total)}<div class="stat-value" style="color:#bfdbfe;font-weight:800;">${dateBR(next.due)}</div>`,'fa-solid fa-calendar-clock','blue',`${next.count} diária(s) prevista(s)`,'next_recebimento');})()}
     </div>
     ${panel('Empresas cadastradas','Toque em uma empresa para abrir o extrato completo',table(['Empresa','Diárias / total','Pagas','Pendentes','Notas fiscais','Recebido','Saldo de NFs'],rows,'Cadastre uma empresa para começar.'))}
     ${detail}
@@ -104,7 +122,7 @@
   }
   function companies(){
     const q=($('#search')?.value||'').toLowerCase();
-    const rows=state.empresas.filter(e=>(e.razao_social+' '+e.nome_fantasia+' '+e.cnpj).toLowerCase().includes(q)).map(e=>`<tr><td><b>${esc(e.nome_fantasia||e.razao_social)}</b><div class="hint">${esc(e.razao_social||'')}</div></td><td>${esc(e.cnpj||'—')}</td><td>${esc(e.telefone||'—')}</td><td>${esc(e.email||'—')}</td><td><div class="actions"><button class="mini-btn" data-edit="empresa" data-id="${e.id}"><i class="fa fa-pen"></i></button><button class="mini-btn" data-delete="empresas" data-id="${e.id}"><i class="fa fa-trash"></i></button></div></td></tr>`).join('');
+    const rows=state.empresas.filter(e=>(e.razao_social+' '+e.nome_fantasia+' '+e.cnpj).toLowerCase().includes(q)).map(e=>`<tr><td><b>${esc(e.nome_fantasia||e.razao_social)}</b><div class="hint">${esc(e.razao_social||'')}</div>${whatsappLink(e.telefone)?`<a class="mini-btn whatsapp-btn" href="${whatsappLink(e.telefone)}" target="_blank" rel="noopener"><i class="fa-brands fa-whatsapp"></i> WhatsApp</a>`:''}</td><td>${esc(e.cnpj||'—')}</td><td>${esc(e.telefone||'—')}</td><td>${esc(e.email||'—')}</td><td><div class="actions"><button class="mini-btn" data-edit="empresa" data-id="${e.id}"><i class="fa fa-pen"></i></button><button class="mini-btn" data-delete="empresas" data-id="${e.id}"><i class="fa fa-trash"></i></button></div></td></tr>`).join('');
     return panel('Empresas tomadoras','Cadastre e mantenha os dados das empresas contratantes',`<div class="toolbar" style="margin-bottom:14px"><input id="search" class="search" placeholder="Buscar empresa ou CNPJ"><button class="primary-btn" data-open="empresa"><i class="fa fa-plus"></i> Nova empresa</button></div>${table(['Empresa','CNPJ','Telefone','E-mail','Ações'],rows,'Cadastre sua primeira empresa.')}`);
   }
   function diaries(){
@@ -266,7 +284,7 @@
       const art=document.createElement('div');art.className='report-art';art.innerHTML=`<div class=report-brand>CD <span>CONTROLE DE DIÁRIAS</span></div><h1>RELATÓRIO DETALHADO DE TRABALHO</h1><div class=report-sub>${esc(company?.nome_fantasia||company?.razao_social||'Todas as empresas')}<br>${label} • ${new Date(month+'-15T12:00:00').toLocaleDateString('pt-BR',{month:'long',year:'numeric'})}</div>${opts.summary?`<div class=report-summary><div><small>DIÁRIAS / QUANTIDADE</small><b>${qty}</b><small>${list.length} lançamento(s)</small></div><div><small>VALOR TRABALHADO</small><b>${money(total)}</b></div>${opts.status?`<div><small>PAGO</small><b>${money(paid)}</b></div><div><small>PENDENTE</small><b>${money(pending)}</b></div>`:''}</div>`:''}<table class=report-data><thead><tr>${columns}</tr></thead><tbody>${rows||`<tr><td colspan="${8}" class="empty-report">Nenhuma diária encontrada nesse período.</td></tr>`}</tbody></table><div class=report-footer>Registros incluídos: ${list.length} • Quantidade total: ${qty}<br>Gerado em ${new Date().toLocaleString('pt-BR')}</div>`;
       const preview=$('#custom-report-preview');if(!preview)throw new Error('Área de pré-visualização não encontrada. Atualize a página e tente novamente.');preview.innerHTML='';preview.appendChild(art);
       await ensureReportLibraries(type);
-      const canvas=await window.html2canvas(art,{backgroundColor:'#0b1220',scale:2,useCORS:true,logging:false,windowWidth:art.scrollWidth});
+      const canvas=await window.html2canvas(art,{backgroundColor:'#0b1220',scale:2,useCORS:true,logging:false,windowWidth:art.offsetWidth});
       if(!canvas||!canvas.width||!canvas.height)throw new Error('A imagem do relatório não foi criada.');
       if(type==='jpg'){const a=document.createElement('a');a.download=`CD-Relatorio-${month}-${period}.jpg`;a.href=canvas.toDataURL('image/jpeg',.96);a.click();}
       else{const {jsPDF}=window.jspdf,pdf=new jsPDF('p','mm','a4'),pageW=190,pageH=277,pxPerMm=canvas.width/pageW,sourcePageH=Math.floor(pageH*pxPerMm),image=canvas.toDataURL('image/png');let y=0,page=0;while(y<canvas.height){if(page>0)pdf.addPage();const sliceH=Math.min(sourcePageH,canvas.height-y),slice=document.createElement('canvas');slice.width=canvas.width;slice.height=sliceH;slice.getContext('2d').drawImage(canvas,0,y,canvas.width,sliceH,0,0,canvas.width,sliceH);const sliceData=slice.toDataURL('image/png'),h=sliceH/pxPerMm;pdf.addImage(sliceData,'PNG',10,10,pageW,h);y+=sliceH;page++;}pdf.save(`CD-Relatorio-${month}-${period}.pdf`);}
